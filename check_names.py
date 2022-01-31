@@ -3,6 +3,8 @@ from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
 import pathlib
 import re
+import shutil
+
 import eyed3
 
 
@@ -49,6 +51,19 @@ def check_name(name):
     # print('Encoded: ', arr.decode('utf-8'))
 
 
+def decide_and_rename(name):
+    new_name = convert_encode(name)
+    if name != new_name:
+        new_name_no_ext = pathlib.Path(new_name).stem
+        new_name_no_ext = re.sub('[0-9.\-\(\)]', '', new_name_no_ext)
+        new_name_no_hebrew = re.sub('[א-ת]', '', new_name_no_ext)
+        if length_conditions(new_name_no_ext, new_name_no_hebrew) or mix_condition(new_name_no_ext):
+            return name
+        else:
+            return new_name
+    return name
+
+
 def traverse_directory(path):
     fname = []
     dname = []
@@ -66,26 +81,50 @@ def traverse_directory(path):
     print("Final file names:", fname)
     print("Final dir  names:", dname)
 
-def length_conditions(old,new):
+
+def length_conditions(old, new):
     return len(new) > 0 and \
-            ((len(old) - len(new)) / len(old) < 0.3)
+           ((len(old) - len(new)) / len(old) < 0.3)
+
 
 def mix_condition(name):
     return re.search('[a-zA-z][א-ת][a-zA-Z]', name) is not None
 
+def move_all_contents(srcdir,trgdir):
+    for root, d_names, f_names in os.walk(srcdir):
+        for f in f_names:
+            full_src_file_name = os.path.join(srcdir, f)
+            full_trg_file_name = os.path.join(trgdir, f)
+            print(f"Moving file {full_src_file_name} to {full_trg_file_name}")
+        for d in d_names:
+            full_src_dir_name = os.path.join(srcdir, d)
+            full_trg_dir_name = os.path.join(trgdir, d)
+            print(f"Moving dir  {full_src_dir_name} to {full_trg_dir_name}")
+
+
 def rename_files_demo(path):
     print("Root path: ", path)
     for root, d_names, f_names in os.walk(path):
-        for f in f_names:
-            new_file_name = convert_encode(f)
-            if f != new_file_name:
-                new_file_name_no_ext = pathlib.Path(new_file_name).stem
-                new_file_name_no_ext = re.sub('[0-9.\-\(\)]', '', new_file_name_no_ext)
-                new_file_name_no_hebrew = re.sub('[א-ת]', '', new_file_name_no_ext)
-                if length_conditions(new_file_name_no_ext,new_file_name_no_hebrew) or mix_condition(new_file_name_no_ext):
-                    print(f"**** No need to rename {new_file_name}, after stem: {new_file_name_no_hebrew}")
-                else:
-                    print(f'Renaming \r\n   {f}\r\n to\r\n    {new_file_name}\r\n***')
+        # for d in f_names:
+        #     new_file_name = decide_and_rename(d)
+        #     if new_file_name == d:
+        #         print(f"**** No need to rename file {new_file_name}")
+        #     else:
+        #         print(f'Renaming file \r\n   {d}\r\n to\r\n    {new_file_name}\r\n***')
+        for d in d_names:
+            new_dir_name = decide_and_rename(d)
+            full_dir_name = os.path.join(root, d)
+            new_full_dir_name = os.path.join(root, new_dir_name)
+            if new_dir_name == d:
+                pass
+                # print(f"**** No need to rename dir  {new_dir_name}")
+            else:
+                try:
+                    os.rename(full_dir_name, new_full_dir_name)
+                    print(f'Renaming dir  \r\n   {full_dir_name}\r\n to\r\n    {new_full_dir_name}\r\n***')
+                except:
+                    # print(f'** Cannot rename dir  \r\n   {full_dir_name}\r\n to\r\n    {new_full_dir_name}\r\n***')
+                    move_all_contents(full_dir_name, new_full_dir_name)
 
 
 if __name__ == '__main__':
