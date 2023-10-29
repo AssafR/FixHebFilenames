@@ -13,6 +13,7 @@ def convert_encode(string):
         result = string.encode('iso-8859-1').decode('iso-8859-8').encode('utf-16').decode('utf-16')
     except:
         result = string.encode('utf-16').decode('utf-16')
+    result = result.replace('צה_ל','צהל')
     return result
 
 
