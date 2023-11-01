@@ -5,13 +5,15 @@ from pathlib import Path
 import cv2
 import pytesseract
 from pytesseract import Output, run_and_get_output
+from pathlib import Path
 
 tesseract_exe = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
 
 ##########
 # Source: https://stackoverflow.com/questions/54246492/pytesseract-difference-between-image-to-string-and-image-to-boxes
 # Modification
+
+COLOR_GREEN = (0, 255, 0)
 
 
 def image_to_boxes_keep_same(
@@ -43,8 +45,12 @@ def new_image_to_boxes(image, lang, output_type, config=None):  # .splitlines() 
 def main():
     print('|'.join(sys.argv))
     jpeg_location = sys.argv[1]
-    print(jpeg_location)
     txt_location = sys.argv[2]
+    letters_location = sys.argv[3]
+
+
+
+    print(jpeg_location)
     txt_path = Path(txt_location)
     # args is a list of the command line args
     jpgfiles = glob.glob(jpeg_location + '/*.jpeg')
@@ -57,7 +63,7 @@ def main():
         filename = Path(jpgfile).stem
         txt_filename = txt_path.joinpath(filename)
         # perform_ocr_commandline(jpgfile, txt_filename)
-        perform_ocr_api(jpgfile, txt_filename)
+        perform_ocr_api(jpgfile, txt_filename, letters_location)
 
 
 def perform_ocr_commandline(jpgfile, txt_filename):
@@ -74,8 +80,17 @@ def hconcat_resize_max(im_list, interpolation=cv2.INTER_CUBIC):
                       for im in im_list]
     return cv2.hconcat(im_list_resize)
 
+def new_char_filename(original_filename,letters_location,description_row):
+    path = Path(original_filename)
+    b = description_row.split()
+    hex_str = b[0].encode("utf-8").hex()
+    b[0] = hex_str + 'h_'
+    new_filename = '_'.join(b)
+    new_filename_full = path.with_stem(new_filename + '__' + path.stem).with_suffix('.png')
+    new_filename_full = Path(letters_location).joinpath(new_filename_full.name)
+    return new_filename_full.as_posix()
 
-def perform_ocr_api(jpgfile, txt_filename):
+def perform_ocr_api(jpgfile, txt_filename, letters_location):
     img = cv2.imread(jpgfile)
 
     char_boxes = {}
@@ -101,6 +116,7 @@ def perform_ocr_api(jpgfile, txt_filename):
     #                                          output_type=pytesseract.Output.DICT)  # .splitlines() #, output_type=pytesseract.Output.DICT
 
     for row in string_boxes:
+        detected_box_file_name = new_char_filename(jpgfile, letters_location, row)
         b = row.split(' ')
         detected_char, left, top, right, bottom, page = b[0], int(b[1]), int(b[2]), int(b[3]), int(b[4]), int(b[5])
         # detected_char, left, top, right, bottom = \
@@ -111,14 +127,19 @@ def perform_ocr_api(jpgfile, txt_filename):
         # (x1,y1), (x2,y2)
         # cv2.rectangle(img, (x, hImg - y), (w, hImg - h), (255, 0, 0), 2)
 
-        print("\n** ", detected_char, " **")
-        print(b[1:])
+        print(f"\n** {detected_char} **")
+        print(b[1:]) # Row of numbers
 
         tmp_img = img.copy()
-        char_box = img[(hImg - bottom):(hImg - top), left:right].copy()
-        cv2.rectangle(tmp_img, (left, hImg - top), (right, hImg - bottom), (0, 255, 0), 3)
+        calc_img_bottom = hImg - bottom
+        calc_img_top = hImg - top
 
-        char_boxes[detected_char] = char_boxes.get(detected_char, []) + [char_box]
+        char_box, char_box_enlarged = extract_box(img, left, right, calc_img_top, calc_img_bottom, 1.2)
+        # cv2.rectangle(tmp_img, (left, calc_img_top), (right, calc_img_bottom), COLOR_GREEN, 3)
+
+        Path(detected_box_file_name).parent.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(detected_box_file_name, char_box)
+        char_boxes[detected_char] = char_boxes.get(detected_char, []) + [char_box_enlarged]
 
         # img_resized = cv2.resize(tmp_img, (int(ratio * wImg), int(ratio * hImg)))
 
@@ -144,11 +165,17 @@ def perform_ocr_api(jpgfile, txt_filename):
 
     for char, images in char_boxes.items():
         print(f'*** {char} ***')
+        ocr_from_boxes = ''
         for img in images:
+            re_ocr = pytesseract.image_to_string(img, lang='heb').strip()
+            ocr_from_boxes += re_ocr
             cv2.rectangle(img, (0, 0), (img.shape[1], img.shape[0]), (0, 255, 0), 3)
+
+        print(f"Re-interpreted: [{'|'.join(ocr_from_boxes)}]")
         all_images = hconcat_resize_max(images)  # cv2.hconcat(images)
         cv2.imshow('img', all_images)
         cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     img_resized = cv2.resize(img, (int(ratio * wImg), int(ratio * hImg)))
 
@@ -156,6 +183,25 @@ def perform_ocr_api(jpgfile, txt_filename):
     cv2.waitKey(0)
 
     return None
+
+
+def extract_box(img, left, right, top, bottom, enlarge_factor=1.0):
+    width = (right - left)
+    height = (top - bottom)
+    center_x = (left + right) / 2
+    center_y = (top + bottom) / 2
+    new_width = width * enlarge_factor
+    new_height = height * enlarge_factor
+
+    # Hope it's okay, didn't test edge cases yet
+    new_left = max(int(center_x - new_width / 2), 0)
+    new_right = min(int(center_x + new_width / 2), img.shape[1])
+    new_top = min(int(center_y + new_height / 2), img.shape[0])
+    new_bottom = max(int(center_y - new_height / 2), 0)
+
+    char_box_original = img[bottom:top, left:right].copy()
+    char_box_enlarged = img[new_bottom:new_top, new_left:new_right].copy()
+    return char_box_original, char_box_enlarged
 
 
 if __name__ == '__main__':
