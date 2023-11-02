@@ -14,6 +14,10 @@ import tesseract_sql
 
 tesseract_exe = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
+COLOR_GREEN = (0, 255, 0)
+ASPECT_RATIO_CORRECTION = 2.0
+
+
 ##########
 # Source: https://stackoverflow.com/questions/54246492/pytesseract-difference-between-image-to-string-and-image-to-boxes
 # Modification
@@ -95,7 +99,8 @@ def new_char_filename(original_filename,letters_location,description_row):
     new_filename_full = Path(letters_location).joinpath(new_filename_full.name)
     return new_filename_full.as_posix()
 
-def perform_ocr_api(jpgfile, txt_filename, letters_location):
+
+def perform_ocr_api(jpgfile, txt_filename, letters_location, aspect_correction=1.0):
     full_img = cv2.imread(jpgfile)
 
     char_boxes = {}
