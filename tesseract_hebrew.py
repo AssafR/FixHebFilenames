@@ -6,6 +6,11 @@ import cv2
 import pytesseract
 from pytesseract import Output, run_and_get_output
 from pathlib import Path
+import tesseract_sql
+
+# INSERT OR IGNORE INTO aspect_corrections(aspect) VALUES(4.0);
+
+
 
 tesseract_exe = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 

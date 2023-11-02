@@ -1,5 +1,5 @@
 --
--- File generated with SQLiteStudio v3.4.4 on ??? ? ??? 2 18:03:25 2023
+-- File generated with SQLiteStudio v3.4.4 on ??? ? ??? 2 22:48:33 2023
 --
 -- Text encoding used: System
 --
@@ -10,9 +10,28 @@ BEGIN TRANSACTION;
 DROP TABLE IF EXISTS aspect_corrections;
 
 CREATE TABLE IF NOT EXISTS aspect_corrections (
-    aspect_correction_id      PRIMARY KEY,
-    aspect               REAL NOT NULL
+    aspect_correction_id INTEGER PRIMARY KEY ASC ON CONFLICT ABORT AUTOINCREMENT,
+    aspect               REAL    NOT NULL
+                                 UNIQUE ON CONFLICT IGNORE
 );
+
+INSERT INTO aspect_corrections (
+                                   aspect_correction_id,
+                                   aspect
+                               )
+                               VALUES (
+                                   1,
+                                   1.0
+                               );
+
+INSERT INTO aspect_corrections (
+                                   aspect_correction_id,
+                                   aspect
+                               )
+                               VALUES (
+                                   2,
+                                   2.0
+                               );
 
 
 -- Table: images
