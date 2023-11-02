@@ -91,18 +91,23 @@ def new_char_filename(original_filename,letters_location,description_row):
     return new_filename_full.as_posix()
 
 def perform_ocr_api(jpgfile, txt_filename, letters_location):
-    img = cv2.imread(jpgfile)
+    full_img = cv2.imread(jpgfile)
 
     char_boxes = {}
 
-    hImg, wImg, _ = img.shape
+    hImg, wImg, _ = full_img.shape
+    aspect_ratio_correction = 2.0
+    full_img = cv2.resize(full_img, (int(aspect_ratio_correction * wImg), int(hImg)))
+    hImg, wImg, _ = full_img.shape
+
+
     ratio = 1024.0 / wImg;
 
     # img = cv2.resize(img, (int(ratio * wImg), int(ratio * hImg)))
 
     # Adding custom options
     custom_config = r'--oem 3 --psm 6 -l heb'
-    txt = pytesseract.image_to_string(img, config=custom_config)
+    txt = pytesseract.image_to_string(full_img, config=custom_config)
     print(txt)
     print('----------')
     # d = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
@@ -110,7 +115,7 @@ def perform_ocr_api(jpgfile, txt_filename, letters_location):
     # for i in range(n_boxes):
     #     (x, y, w, h) = (d['left'][i], d['top'][i], d['width'][i], d['height'][i])
     #     cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    string_boxes = pytesseract.image_to_boxes(img, lang="heb",
+    string_boxes = pytesseract.image_to_boxes(full_img, lang="heb",
                                               output_type=pytesseract.Output.STRING).splitlines()  # , output_type=pytesseract.Output.DICT
     # string_boxes = pytesseract.image_to_data(img, lang="heb",
     #                                          output_type=pytesseract.Output.DICT)  # .splitlines() #, output_type=pytesseract.Output.DICT
@@ -130,11 +135,11 @@ def perform_ocr_api(jpgfile, txt_filename, letters_location):
         print(f"\n** {detected_char} **")
         print(b[1:]) # Row of numbers
 
-        tmp_img = img.copy()
+        tmp_img = full_img.copy()
         calc_img_bottom = hImg - bottom
         calc_img_top = hImg - top
 
-        char_box, char_box_enlarged = extract_box(img, left, right, calc_img_top, calc_img_bottom, 1.2)
+        char_box, char_box_enlarged = extract_box(full_img, left, right, calc_img_top, calc_img_bottom, 1.2)
         # cv2.rectangle(tmp_img, (left, calc_img_top), (right, calc_img_bottom), COLOR_GREEN, 3)
 
         Path(detected_box_file_name).parent.mkdir(parents=True, exist_ok=True)
@@ -172,15 +177,15 @@ def perform_ocr_api(jpgfile, txt_filename, letters_location):
             cv2.rectangle(img, (0, 0), (img.shape[1], img.shape[0]), (0, 255, 0), 3)
 
         print(f"Re-interpreted: [{'|'.join(ocr_from_boxes)}]")
-        all_images = hconcat_resize_max(images)  # cv2.hconcat(images)
-        cv2.imshow('img', all_images)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # all_images = hconcat_resize_max(images)  # cv2.hconcat(images)
+        # cv2.imshow('img', all_images)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
-    img_resized = cv2.resize(img, (int(ratio * wImg), int(ratio * hImg)))
-
+    img_resized = cv2.resize(full_img, (int(ratio * wImg), int(ratio * hImg)))
     cv2.imshow('img', img_resized)
-    cv2.waitKey(0)
+    cv2.waitKey(1000)
+    cv2.destroyAllWindows()
 
     return None
 
