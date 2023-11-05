@@ -1,16 +1,23 @@
+import datetime
 from dataclasses import dataclass, field
 import sqlite3
 
 
 # Define a function to create a database connection
 def create_connection(database):
-    return sqlite3.connect(database)
+    return sqlite3.connect(database,
+                           detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES  # For parsing datetypes
+                           )
 
 
 @dataclass
 class AspectCorrection:
     aspect_correction_id: int
     aspect: float
+
+    def __init__(self, aspect, aspect_correction_id=None):
+        self.aspect = aspect
+        self.aspect_correction_id = aspect_correction_id
 
     @classmethod
     def from_sql_query(cls, query_result):
@@ -49,6 +56,7 @@ class SubsFiles:
     sub_file_id: int
     file_name: str
     directory_name: str
+    file_date: datetime.datetime
 
     @classmethod
     def from_sql_query(cls, query_result):
@@ -57,7 +65,7 @@ class SubsFiles:
 
 # Define a class to manage the database
 class DatabaseManager:
-    def __init(self, database):
+    def __init__(self, database):
         self.conn = create_connection(database)
 
     def read_aspect_corrections(self):
@@ -124,8 +132,8 @@ class DatabaseManager:
 
     def insert_subs_files(self, subs_files):
         cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO subs_files (file_name, directory_name) VALUES (?, ?)",
-                       (subs_files.file_name, subs_files.directory_name))
+        cursor.execute("INSERT INTO subs_files (file_name, directory_name, file_date) VALUES (?, ?, ?)",
+                       (subs_files.file_name, subs_files.directory_name, subs_files.file_date))
         self.conn.commit()
         inserted_id = cursor.lastrowid
         cursor.close()
