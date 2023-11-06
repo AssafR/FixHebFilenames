@@ -1,14 +1,17 @@
 import datetime
+import pathlib
 from dataclasses import dataclass, field
 import sqlite3
+import numpy as np
+import io
 
+from tesseract_hebrew_utils import get_file_attributes
 
 # Define a function to create a database connection
 def create_connection(database):
     return sqlite3.connect(database,
                            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES  # For parsing datetypes
                            )
-
 
 @dataclass
 class AspectCorrection:
@@ -27,7 +30,13 @@ class AspectCorrection:
 @dataclass
 class Image:
     image_id: int
+    image_text: str
     image: bytes
+
+    def __init__(self, text, img):
+        self.image_id = None
+        self.image_text = text
+        self.image = img
 
     @classmethod
     def from_sql_query(cls, query_result):
@@ -58,15 +67,28 @@ class SubsFiles:
     directory_name: str
     file_date: datetime.datetime
 
+    def __init__(self, full_file_name):
+        self.sub_file_id = None
+        self.file_name, self.directory_name, self.file_date = get_file_attributes(full_file_name)
+
     @classmethod
     def from_sql_query(cls, query_result):
         return cls(*query_result)
+
+    def full_file_name(self):  # Manual addition
+        return pathlib.Path(self.directory_name).joinpath(self.file_name).as_posix()
 
 
 # Define a class to manage the database
 class DatabaseManager:
     def __init__(self, database):
         self.conn = create_connection(database)
+        # Converts np.array to TEXT when inserting
+        sqlite3.register_adapter(np.ndarray, adapt_array)
+
+        # Converts TEXT to np.array when selecting
+        # sqlite3.register_converter("array", convert_array)
+        sqlite3.register_converter("array", lambda x: np.load(io.BytesIO(x)))
 
     def read_aspect_corrections(self):
         cursor = self.conn.cursor()
@@ -111,7 +133,7 @@ class DatabaseManager:
 
     def insert_image(self, image):
         cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO images (image) VALUES (?)", (image.image,))
+        cursor.execute("INSERT INTO images (image_text,image) VALUES (?, ?)", (image.image, image.image_text))
         self.conn.commit()
         inserted_id = cursor.lastrowid
         cursor.close()
@@ -132,10 +154,31 @@ class DatabaseManager:
 
     def insert_subs_files(self, subs_files):
         cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO subs_files (file_name, directory_name, file_date) VALUES (?, ?, ?)",
+        cursor.execute("INSERT OR IGNORE INTO subs_files (file_name, directory_name, file_date) VALUES (?, ?, ?)",
                        (subs_files.file_name, subs_files.directory_name, subs_files.file_date))
         self.conn.commit()
-        inserted_id = cursor.lastrowid
+        cursor.execute(
+            "SELECT sub_file_id FROM subs_files WHERE file_name = ? AND directory_name = ? AND file_date = ?",
+            (subs_files.file_name, subs_files.directory_name, subs_files.file_date))
+        result = cursor.fetchone()
         cursor.close()
-        subs_files.sub_file_id = inserted_id
-        return subs_files
+        if result:
+            subs_files.sub_file_id = result[0]
+            return subs_files
+        return None
+
+
+def adapt_array(arr):
+    """
+    http://stackoverflow.com/a/31312102/190597 (SoulNibbler)
+    """
+    out = io.BytesIO()
+    np.save(out, arr)
+    out.seek(0)
+    return sqlite3.Binary(out.getvalue())
+
+
+def convert_array(text):
+    out = io.BytesIO(text)
+    out.seek(0)
+    return np.load(out)

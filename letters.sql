@@ -1,5 +1,5 @@
 --
--- File generated with SQLiteStudio v3.4.4 on ??? ? ??? 2 22:48:33 2023
+-- File generated with SQLiteStudio v3.4.4 on ??? ? ??? 5 20:47:41 2023
 --
 -- Text encoding used: System
 --
@@ -15,31 +15,14 @@ CREATE TABLE IF NOT EXISTS aspect_corrections (
                                  UNIQUE ON CONFLICT IGNORE
 );
 
-INSERT INTO aspect_corrections (
-                                   aspect_correction_id,
-                                   aspect
-                               )
-                               VALUES (
-                                   1,
-                                   1.0
-                               );
-
-INSERT INTO aspect_corrections (
-                                   aspect_correction_id,
-                                   aspect
-                               )
-                               VALUES (
-                                   2,
-                                   2.0
-                               );
-
 
 -- Table: images
 DROP TABLE IF EXISTS images;
 
 CREATE TABLE IF NOT EXISTS images (
-    image_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    image    BLOB
+    image_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_text TEXT,
+    image      ARRAY
 );
 
 
@@ -65,9 +48,16 @@ CREATE TABLE IF NOT EXISTS subs_decoded (
 DROP TABLE IF EXISTS subs_files;
 
 CREATE TABLE IF NOT EXISTS subs_files (
-    sub_file_id    INTEGER PRIMARY KEY,
-    file_name      TEXT    CONSTRAINT sub_files_NotNull NOT NULL,
-    directory_name TEXT
+    sub_file_id    INTEGER   PRIMARY KEY,
+    file_name      TEXT      CONSTRAINT sub_files_NotNull NOT NULL,
+    directory_name TEXT,
+    file_date      TIMESTAMP NOT NULL,
+    UNIQUE (
+        file_name,
+        directory_name,
+        file_date
+    )
+    ON CONFLICT IGNORE
 );
 
 
